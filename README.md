@@ -7,7 +7,7 @@
 
 ## Лабораторная работа №1
 
-**Тема:** Исследование компилятора gcc, язык ассемблера. Связь процесса и ОС. Makefile, git.
+**Тема:** Исследование компилятора `gcc`, язык ассемблера. Связь процесса и ОС. Makefile, git.
 
 ### Шаг 1. Генерация ассемблерного кода
 
@@ -25,24 +25,23 @@ int main() {
     printf("%d\n", fact_calc(7));
     return 0;
 }
-
 ```
 
 Трансляция в ассемблер с разными уровнями оптимизации:
 
 ```bash
-
 gcc -S -O0 -o fact_O0.s fact_calc.c
 gcc -S -O1 -o fact_O1.s fact_calc.c
 gcc -S -O2 -o fact_O2.s fact_calc.c
 gcc -S -O3 -o fact_O3.s fact_calc.c
 gcc -S -Os -o fact_Os.s fact_calc.c
-
 ```
 
-Шаг 2. Анализ ассемблерного кода (оптимизация -O1)
-Файл fact_O1.s с подробными комментариями:
+### Шаг 2. Анализ ассемблерного кода (оптимизация -O1)
 
+Файл `fact_O1.s` с подробными комментариями:
+
+```x86asm
 # fact_O1.s - оптимизация первого уровня
 # Автор: Грекова Я.В.
 
@@ -52,16 +51,16 @@ gcc -S -Os -o fact_Os.s fact_calc.c
     .seh_proc   fact_calc
 fact_calc:
     pushq   %rbx            # сохраняем RBX в стеке
-    subq    $32, %rsp       # выделяем место в стеке
+    subq    \$32, %rsp       # выделяем место в стеке
     movl    %ecx, %ebx      # n -> ebx
-    movl    $1, %eax        # возвращаемое значение по умолчанию = 1
-    cmpl    $1, %ecx        # сравниваем n и 1
+    movl    \$1, %eax        # возвращаемое значение по умолчанию = 1
+    cmpl    \$1, %ecx        # сравниваем n и 1
     jle     .L1             # если n <= 1, прыгаем в конец
     leal    -1(%rcx), %ecx  # n-1 -> ecx
     call    fact_calc       # рекурсивный вызов
     imull   %ebx, %eax      # умножаем результат на n
 .L1:
-    addq    $32, %rsp       # восстанавливаем стек
+    addq    \$32, %rsp       # восстанавливаем стек
     popq    %rbx            # возвращаем RBX
     ret
     .seh_endproc
@@ -69,80 +68,80 @@ fact_calc:
     .globl  main
     .seh_proc   main
 main:
-    subq    $40, %rsp
+    subq    \$40, %rsp
     call    __main
-    movl    $7, %ecx        # аргумент 7
+    movl    \$7, %ecx        # аргумент 7
     call    fact_calc
     movl    %eax, %edx
     leaq    .LC0(%rip), %rcx
     call    printf
     xorl    %eax, %eax
-    addq    $40, %rsp
+    addq    \$40, %rsp
     ret
     .seh_endproc
 
     .section .rdata,"dr"
 .LC0:
     .ascii "%d\12\0"
-
 ```
 
-Что удалось найти в коде:
+**Что удалось найти в коде:**
 
-Рекурсивный вызов реализован через call fact_calc
+* Рекурсивный вызов реализован через `call fact_calc`
+* Аргумент функции передаётся через регистр `%ecx`
+* Результат работы возвращается в `%eax`
+* Условие выхода из рекурсии — сравнение аргумента с единицей (`cmpl $1, %ecx`)
 
-Аргумент передаётся через регистр ecx
+### Шаг 3. Модульная структура и Makefile
 
-Результат возвращается в eax
+**Структура проекта:**
 
-Условие выхода из рекурсии — сравнение с 1 (cmpl $1, %ecx)
-
-
-Шаг 3. Модульная структура и Makefile
-Структура проекта:
-
+```text
+.
+├── include/
+│   └── fact_calc.h
+└── src/
+    ├── fact_calc.c
+    └── fact_main.c
 ```
 
-#ifndef FACT_CALC_H
-#define FACT_CALC_H
+**Содержимое файлов проекта:**
 
-int fact_calc(int n);
+* `include/fact_calc.h`
+  ```c
+  #ifndef FACT_CALC_H
+  #define FACT_CALC_H
 
-#endif
+  int fact_calc(int n);
 
-```
+  #endif
+  ```
 
-src/fact_calc.c
+* `src/fact_calc.c`
+  ```c
+  #include "fact_calc.h"
 
-```
+  int fact_calc(int n) {
+      if (n <= 1) return 1;
+      return n * fact_calc(n - 1);
+  }
+  ```
 
-#include "fact_calc.h"
+* `src/fact_main.c`
+  ```c
+  #include <stdio.h>
+  #include "fact_calc.h"
 
-int fact_calc(int n) {
-    if (n <= 1) return 1;
-    return n * fact_calc(n - 1);
-}
+  int main() {
+      printf("Result: %d\n", fact_calc(7));
+      return 0;
+  }
+  ```
 
-```
 
-src/fact_main.c
+**Файл `Makefile`:**
 
-```
-
-#include <stdio.h>
-#include "fact_calc.h"
-
-int main() {
-    printf("Result: %d\n", fact_calc(7));
-    return 0;
-}
-
-```
-
-Makefile
-
-```
-
+```makefile
 CC = gcc
 CFLAGS = -Wall -Wextra -Iinclude
 
@@ -168,29 +167,29 @@ clean:
 	rm -rf $(OBJ_DIR) $(TARGET)
 
 .PHONY: all clean
-
 ```
 
-Шаг 4. Параллельный процесс и синхронизация
+---
+
+### Шаг 4. Параллельный процесс и синхронизация
+
 Реализована программа с разделяемой памятью (POSIX shared memory) и семафором.
 
-Структура:
+**Структура проекта:**
 
-```
-
+```text
 parallel_fact/
-├── include/fact_calc.h
+├── include/
+│   └── fact_calc.h
 ├── src/
 │   ├── fact_calc.c
 │   └── parallel_main.c
 └── Makefile
-
 ```
 
-src/parallel_main.c (фрагмент — основная логика):
+**Файл `src/parallel_main.c` (фрагмент — основная логика):**
 
-```
-
+```c
 key_t key = ftok(".", 'G');
 int shm_id = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
 int* shared_data = (int*)shmat(shm_id, NULL, 0);
@@ -209,25 +208,24 @@ if (pid == 0) {
     sem_post(sem);
     wait(NULL);
 }
-
 ```
 
-Особенности реализации:
+**Особенности реализации:**
 
-Родительский процесс вычисляет факториал
+* Родительский процесс вычисляет факториал
+* Дочерний процесс читает результат из разделяемой памяти
+* Семафор гарантирует правильный порядок доступа к данным
+* Все используемые ресурсы (память и семафоры) освобождаются корректно
 
-Дочерний процесс читает результат из разделяемой памяти
+---
 
-Семафор гарантирует порядок доступа
+## Лабораторная работа №3
 
-Все ресурсы освобождаются корректно
+**Тема:** Реализация скрипта резервного копирования изображений
 
-Лабораторная работа №3
-Тема: Реализация скрипта резервного копирования изображений
+**Задача:** Скопировать из указанной папки все изображения в папку резервного хранения.
 
-Задача: Скопировать из указанной папки все изображения в папку резервного хранения.
-
-3a. Bash-скрипт (backup_script.sh)
+### 3a. Bash-скрипт (`backup_script.sh`)
 
 ```bash
 #!/bin/bash
@@ -235,136 +233,124 @@ if (pid == 0) {
 # Автор: Грекова Я.В.
 # Создание бэкапа изображений
 
-if [ -z "$1" ]; then
+if [ -z "\$1" ]; then
     echo "Ошибка: Укажите путь к папке"
-    echo "Использование: $0 /путь/к/папке"
+    echo "Использование: \$0 /путь/к/папке"
     exit 1
 fi
 
-SOURCE_DIR="$1"
-PARENT_DIR=$(dirname "$SOURCE_DIR")
-FOLDER_NAME=$(basename "$SOURCE_DIR")
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-BACKUP_NAME="${FOLDER_NAME}_backup_${TIMESTAMP}"
-BACKUP_PATH="${PARENT_DIR}/${BACKUP_NAME}"
+SOURCE_DIR="\$1"
+PARENT_DIR=\((dirname "\)SOURCE_DIR")
+FOLDER_NAME=\((basename "\)SOURCE_DIR")
+TIMESTAMP=\$(date +"%Y%m%d-%H%M%S")
+BACKUP_NAME="\({FOLDER_NAME}_backup_\){TIMESTAMP}"
+BACKUP_PATH="\({PARENT_DIR}/\){BACKUP_NAME}"
 
-if [ ! -d "$SOURCE_DIR" ]; then
-    echo "Ошибка: Папка $SOURCE_DIR не найдена"
+if [ ! -d "\$SOURCE_DIR" ]; then
+    echo "Ошибка: Папка \$SOURCE_DIR не найдена"
     exit 1
 fi
 
-mkdir -p "$BACKUP_PATH" || { echo "Ошибка создания папки"; exit 1; }
+mkdir -p "\$BACKUP_PATH" || { echo "Ошибка создания папки"; exit 1; }
 
 echo "Копирование файлов..."
 COUNTER=0
-TMPFILE=$(mktemp)
+TMPFILE=\$(mktemp)
 
-find "$SOURCE_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.heic" \) -exec cp -v -- "{}" "$BACKUP_PATH" \; > "$TMPFILE"
+find "\$SOURCE_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.heic" \) -exec cp -v -- "{}" "\(BACKUP_PATH" \; > "\)TMPFILE"
 
-COUNTER=$(wc -l < "$TMPFILE")
-cat "$TMPFILE"
+COUNTER=\((wc -l < "\)TMPFILE")
+cat "\$TMPFILE"
 
-if [ $COUNTER -eq 0 ]; then
+if [ \$COUNTER -eq 0 ]; then
     echo "Предупреждение: изображения не найдены"
-    rmdir "$BACKUP_PATH"
+    rmdir "\$BACKUP_PATH"
     exit 1
 else
-    echo "Скопировано файлов: $COUNTER"
-    echo "Бэкап создан: $BACKUP_PATH"
+    echo "Скопировано файлов: \$COUNTER"
+    echo "Бэкап создан: \$BACKUP_PATH"
 fi
 
-rm -f "$TMPFILE"
+rm -f "\$TMPFILE"
 exit 0
 ```
 
-Пример запуска:
+**Пример запуска:**
 
-```
-
+```bash
 chmod +x backup_script.sh
 ./backup_script.sh /home/user/Фото
-
 ```
 
-Результат:
+**Ожидаемый результат работы скрипта:**
 
-Создаётся папка Фото_backup_20250517-143022
+* Создаётся папка вида `Фото_backup_20260518-143022`
+* Копируются все поддерживаемые форматы (`.jpg`, `.png`, `.gif` и др.)
+* В консоль выводится итоговое количество успешно скопированных файлов
 
-Копируются все .jpg, .png, .gif и т.д.
+---
 
-Выводится количество скопированных файлов
+### 3b. PowerShell-скрипт (`backup_script.ps1`)
 
-3b. PowerShell-скрипт (backup_script.ps1)
-
-```
-
+```powershell
 <#
 Автор: Грекова Я.В.
 Создание бэкапа изображений
 #>
 
-param([string]$SourceDir)
+param([string]\$SourceDir)
 
-if (-not $SourceDir) {
+if (-not \$SourceDir) {
     Write-Host "Ошибка: укажите путь к папке"
     Write-Host "Пример: .\backup_script.ps1 C:\Images"
     exit 1
 }
 
-if (-not (Test-Path $SourceDir -PathType Container)) {
-    Write-Host "Ошибка: папка $SourceDir не существует"
+if (-not (Test-Path \$SourceDir -PathType Container)) {
+    Write-Host "Ошибка: папка \$SourceDir не существует"
     exit 1
 }
 
-$ParentDir = Split-Path $SourceDir -Parent
-$FolderName = Split-Path $SourceDir -Leaf
-$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$BackupPath = Join-Path $ParentDir "${FolderName}_backup_${Timestamp}"
+\$ParentDir = Split-Path \(SourceDir -Parent\)FolderName = Split-Path \(SourceDir -Leaf\)Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+\(BackupPath = Join-Path\)ParentDir "\({FolderName}_backup_\){Timestamp}"
 
-New-Item -ItemType Directory -Path $BackupPath -Force | Out-Null
+New-Item -ItemType Directory -Path \$BackupPath -Force | Out-Null
 
-$extensions = @("*.jpg", "*.jpeg", "*.png", "*.gif", "*.heic")
-$counter = 0
+\$extensions = @("*.jpg", "*.jpeg", "*.png", "*.gif", "*.heic")
+\$counter = 0
 
-foreach ($ext in $extensions) {
-    $files = Get-ChildItem -Path $SourceDir -Recurse -Filter $ext -File -ErrorAction SilentlyContinue
-    foreach ($file in $files) {
-        Copy-Item -Path $file.FullName -Destination $BackupPath -Verbose
-        $counter++
+foreach (\$ext in \(extensions) {\)files = Get-ChildItem -Path \(SourceDir -Recurse -Filter\)ext -File -ErrorAction SilentlyContinue
+    foreach (\(file in\)files) {
+        Copy-Item -Path \$file.FullName -Destination \(BackupPath -Verbose\)counter++
     }
 }
 
-if ($counter -eq 0) {
+if (\$counter -eq 0) {
     Write-Host "Внимание: изображения не найдены"
-    Remove-Item -Path $BackupPath -Force
+    Remove-Item -Path \$BackupPath -Force
     exit 1
 } else {
-    Write-Host "Скопировано файлов: $counter"
-    Write-Host "Бэкап создан: $BackupPath"
+    Write-Host "Скопировано файлов: \$counter"
+    Write-Host "Бэкап создан: \$BackupPath"
 }
-
 ```
 
-Пример запуска в PowerShell:
+**Пример запуска в PowerShell:**
 
-```
-
+```powershell
 .\backup_script.ps1 C:\Users\Yana\Pictures
-
 ```
 
-Примечание: Если PowerShell запрещает выполнение скриптов, выполните:
+> **Примечание:** Если PowerShell запрещает выполнение скриптов в системе, перед запуском выполните команду:
+> ```powershell
+> Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
 
-```
+---
 
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+### Структура репозитория
 
-```
-
-Структура репозитория
-
-```
-
+```text
 operating_systems/
 ├── README.md
 ├── lab1/
@@ -380,18 +366,16 @@ operating_systems/
     ├── backup_script.sh
     ├── backup_script.ps1
     └── README.md
-
 ```
 
-Вывод
-В ходе выполнения лабораторных работ были изучены:
+---
 
-Трансляция C в ассемблер GCC
+### Вывод
 
-Структура ассемблерного кода x86-64
+В ходе выполнения лабораторных работ были изучены и освоены:
 
-Сборка проектов с Makefile
-
-Межпроцессное взаимодействие (fork, shared memory, семафоры)
-
-Написание скриптов на Bash и PowerShell для автоматизации задач
+* Трансляция кода на языке C в ассемблер с помощью компилятора `gcc`
+* Структура и особенности ассемблерного кода архитектуры x86-64
+* Автоматизация сборки многомодульных проектов с использованием файлов `Makefile`
+* Организация межпроцессного взаимодействия (функция `fork`, разделяемая память POSIX и семафоры)
+* Написание автоматизирующих скриптов на языках Bash и PowerShell
